@@ -8,6 +8,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sesv2/types"
 )
 
+// Client for Amazon SES.
+// Using SESv2 API with aws-sdk-go-v2.
 type AmazonSESClient struct {
 	sesClient *sesv2.Client
 }
