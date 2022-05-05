@@ -1,4 +1,5 @@
 /tmp/
+.env
 
 # Created by https://www.toptal.com/developers/gitignore/api/go,visualstudiocode,emacs,vim,linux,windows,macos
 # Edit at https://www.toptal.com/developers/gitignore?templates=go,visualstudiocode,emacs,vim,linux,windows,macos

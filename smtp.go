@@ -7,6 +7,7 @@ import (
 	"io"
 	"mime"
 	"net/smtp"
+	"unicode/utf8"
 )
 
 type SMTPClient struct {
@@ -16,17 +17,20 @@ type SMTPClient struct {
 
 const (
 	initialBufferSize = 1024
+	// The maximum length of an encoded-word is 75 characters.
+	// See RFC 2047, section 2.
+	maxEncodedWordLen = 75
 )
 
 var (
-	mimeEncoder = mime.BEncoding
-	crlf        = []byte("\r\n")
+	crlf         = []byte("\r\n")
+	maxBase64Len = base64.StdEncoding.DecodedLen(maxEncodedWordLen)
 )
 
 func (c *SMTPClient) SendMail(ctx context.Context, m *Mail) error {
 	buf := &bytes.Buffer{}
-	buf.Grow(initialBufferSize + len(m.Body)*4/3)
-	err := writeSMTPHeader(buf, m)
+	buf.Grow(initialBufferSize + base64.StdEncoding.EncodedLen(len(m.Body)))
+	err := writeSMTPHeaders(buf, m)
 	if err != nil {
 		return err
 	}
@@ -34,18 +38,10 @@ func (c *SMTPClient) SendMail(ctx context.Context, m *Mail) error {
 	if err != nil {
 		return err
 	}
-
-	enc := NewSMTPBodyEncoder(buf)
-	defer enc.Close()
-	_, err = enc.WriteString(m.Body)
+	err = writeSMTPBody(buf, m.Body)
 	if err != nil {
 		return err
 	}
-	err = enc.Close()
-	if err != nil {
-		return err
-	}
-
 	to := make([]string, len(m.To))
 	for i, s := range m.To {
 		to[i] = s.Address
@@ -54,14 +50,13 @@ func (c *SMTPClient) SendMail(ctx context.Context, m *Mail) error {
 	return err
 }
 
-func writeSMTPHeader(w io.Writer, m *Mail) (err error) {
+func writeSMTPHeaders(w io.Writer, m *Mail) (err error) {
 	lines := []string{
-		"Content-Transfer-Encoding: base64",
+		"From: " + m.From.String(),
+		"To: " + encodeAddresses(m.To),
+		"Subject: " + mime.BEncoding.Encode(CharSet, m.Subject),
 		"Content-Type: " + m.ContentType.Value(),
-		"From: " + mimeEncoder.Encode(CharSet, formatAddress(m.From)),
-		"To: " + mimeEncoder.Encode(CharSet, formatAddresses(m.To)),
-		"Bcc: " + mimeEncoder.Encode(CharSet, formatAddresses(m.BCC)),
-		"Subject: " + mimeEncoder.Encode(CharSet, m.Subject),
+		"Content-Transfer-Encoding: base64",
 	}
 	for _, l := range lines {
 		_, err = io.WriteString(w, l+"\r\n")
@@ -72,43 +67,37 @@ func writeSMTPHeader(w io.Writer, m *Mail) (err error) {
 	return nil
 }
 
-type SMTPBodyEncoder struct {
-	dest io.Writer
-	b64  io.WriteCloser
-}
+func writeSMTPBody(w io.Writer, body string) error {
+	enc := base64.NewEncoder(base64.StdEncoding, w)
+	defer enc.Close()
 
-func NewSMTPBodyEncoder(w io.Writer) *SMTPBodyEncoder {
-	return &SMTPBodyEncoder{
-		dest: w,
-		b64:  base64.NewEncoder(base64.RawStdEncoding, w),
+	// If the content is short, do not bother splitting the encoded-word.
+	if base64.StdEncoding.EncodedLen(len(body)) <= maxEncodedWordLen {
+		_, err := io.WriteString(enc, body)
+		return err
 	}
-}
 
-func (e *SMTPBodyEncoder) WriteString(s string) (int, error) {
-	l := ((78 - 2) * 3) / 4
-	b := []byte(s)
-	sum := 0
-	for {
-		chunk := b
-		if r := len(chunk); r == 0 {
-			break
-		} else if r > l {
-			chunk = chunk[:l]
+	var err error
+	var currentLen, last, runeLen int
+	for i := 0; i < len(body); i += runeLen {
+		// Multi-byte characters must not be split across encoded-words.
+		// See RFC 2047, section 5.3.
+		_, runeLen = utf8.DecodeRuneInString(body[i:])
+		if currentLen+runeLen <= maxBase64Len {
+			currentLen += runeLen
+		} else {
+			_, err = io.WriteString(enc, body[last:i])
+			if err != nil {
+				return err
+			}
+			_, err = io.WriteString(w, "\r\n")
+			if err != nil {
+				return err
+			}
+			last = i
+			currentLen = runeLen
 		}
-		n, err := e.b64.Write(chunk)
-		if err != nil {
-			return n, err
-		}
-		m, err := e.dest.Write(crlf)
-		if err != nil {
-			return n, err
-		}
-		b = b[n:]
-		sum += (n + m)
 	}
-	return sum, nil
-}
-
-func (e *SMTPBodyEncoder) Close() error {
-	return e.b64.Close()
+	_, err = io.WriteString(enc, body[last:])
+	return err
 }

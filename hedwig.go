@@ -35,10 +35,6 @@ type Mail struct {
 
 	// Content type of body. Defaults to "text/plain".
 	ContentType ContentType
-	// CC addresses. Defaults to empty.
-	CC []mail.Address
-	// BCC addresses. Defaults to empty.
-	BCC []mail.Address
 }
 
 type Client interface {
@@ -46,21 +42,13 @@ type Client interface {
 	SendMail(context.Context, *Mail) error
 }
 
-func formatAddresses(addrs []mail.Address) string {
+func encodeAddresses(addrs []mail.Address) string {
 	s := &strings.Builder{}
 	for i, addr := range addrs {
 		if i != 0 {
 			s.WriteString(",")
 		}
-		s.WriteString(formatAddress(addr))
+		s.WriteString(addr.String())
 	}
 	return s.String()
-}
-
-func formatAddress(addr mail.Address) string {
-	name := ""
-	if addr.Name != "" {
-		name = `"` + addr.Name + `" `
-	}
-	return name + "<" + addr.Address + ">"
 }
