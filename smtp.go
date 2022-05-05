@@ -9,7 +9,10 @@ import (
 	"net/smtp"
 )
 
-type SMTPClient struct{}
+type SMTPClient struct {
+	Address string
+	Auth    smtp.Auth
+}
 
 const (
 	initialBufferSize = 1024
@@ -42,13 +45,12 @@ func (c *SMTPClient) SendMail(ctx context.Context, m *Mail) error {
 	if err != nil {
 		return err
 	}
-	buf.Write(crlf)
 
 	to := make([]string, len(m.To))
 	for i, s := range m.To {
 		to[i] = s.Address
 	}
-	err = smtp.SendMail("localhost:1025", nil, m.From.Address, to, buf.Bytes())
+	err = smtp.SendMail(c.Address, c.Auth, m.From.Address, to, buf.Bytes())
 	return err
 }
 

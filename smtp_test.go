@@ -8,7 +8,8 @@ import (
 )
 
 func TestSMTPClient_SendMail(t *testing.T) {
-	if v, ok := os.LookupEnv("TEST_SMTP_HOST"); !ok || v == "" {
+	addr, ok := os.LookupEnv("TEST_SMTP_SERVER")
+	if !ok {
 		t.Skip()
 	}
 	type args struct {
@@ -22,7 +23,9 @@ func TestSMTPClient_SendMail(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			c: &SMTPClient{},
+			c: &SMTPClient{
+				Address: addr,
+			},
 			args: args{
 				ctx: context.TODO(),
 				m: &Mail{
@@ -61,8 +64,7 @@ html {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := &SMTPClient{}
-			if err := c.SendMail(tt.args.ctx, tt.args.m); (err != nil) != tt.wantErr {
+			if err := tt.c.SendMail(tt.args.ctx, tt.args.m); (err != nil) != tt.wantErr {
 				t.Errorf("SMTPClient.SendMail() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
