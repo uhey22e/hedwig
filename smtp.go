@@ -27,7 +27,7 @@ var (
 	maxBase64Len = base64.StdEncoding.DecodedLen(maxEncodedWordLen)
 )
 
-func (c *SMTPClient) SendMail(ctx context.Context, m *Mail) error {
+func (c *SMTPClient) SendMail(ctx context.Context, m *EMail) error {
 	buf := &bytes.Buffer{}
 	buf.Grow(initialBufferSize + base64.StdEncoding.EncodedLen(len(m.Body)))
 	err := writeSMTPHeaders(buf, m)
@@ -50,7 +50,7 @@ func (c *SMTPClient) SendMail(ctx context.Context, m *Mail) error {
 	return err
 }
 
-func writeSMTPHeaders(w io.Writer, m *Mail) (err error) {
+func writeSMTPHeaders(w io.Writer, m *EMail) (err error) {
 	lines := []string{
 		"From: " + m.From.String(),
 		"To: " + encodeAddresses(m.To),

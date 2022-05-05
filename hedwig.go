@@ -27,7 +27,7 @@ func (t ContentType) Value() string {
 	}[t]
 }
 
-type Mail struct {
+type EMail struct {
 	From    mail.Address
 	To      []mail.Address
 	Subject string
@@ -39,7 +39,7 @@ type Mail struct {
 
 type Client interface {
 	// Send an email.
-	SendMail(context.Context, *Mail) error
+	SendMail(context.Context, *EMail) error
 }
 
 func encodeAddresses(addrs []mail.Address) string {

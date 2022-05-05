@@ -15,7 +15,7 @@ func TestAmazonSESClient_SendMail(t *testing.T) {
 		t.Fatal(err)
 	}
 	c := NewAmazonSESClient(cfg)
-	if err := c.SendMail(ctx, content); err != nil {
+	if err := c.SendMail(ctx, email); err != nil {
 		t.Errorf("AmazonSESClient.SendMail() error = %v", err)
 	}
 }

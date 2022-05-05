@@ -18,7 +18,7 @@ func NewAmazonSESClient(cfg aws.Config) *AmazonSESClient {
 	}
 }
 
-func (c *AmazonSESClient) SendMail(ctx context.Context, m *Mail) error {
+func (c *AmazonSESClient) SendMail(ctx context.Context, m *EMail) error {
 	params := &sesv2.SendEmailInput{
 		FromEmailAddress: aws.String(m.From.String()),
 		Destination: &types.Destination{

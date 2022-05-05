@@ -23,7 +23,7 @@ func TestSMTPClient_SendMail(t *testing.T) {
 		Auth:    smtp.PlainAuth("", os.Getenv("TEST_SMTP_USERNAME"), os.Getenv("TEST_SMTP_PASSWORD"), host),
 	}
 	ctx := context.TODO()
-	if err := c.SendMail(ctx, content); err != nil {
+	if err := c.SendMail(ctx, email); err != nil {
 		t.Errorf("SMTPClient.SendMail() error = %v", err)
 	}
 }

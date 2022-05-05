@@ -6,7 +6,7 @@ import (
 )
 
 var (
-	content = &Mail{
+	email = &EMail{
 		From: mail.Address{
 			Name:    "送信者の名前",
 			Address: os.Getenv("TEST_MAIL_FROM"),
