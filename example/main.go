@@ -41,6 +41,14 @@ func withTemplate() {
 	client.SendMail(context.TODO(), to, msg)
 }
 
+func duplicate() {
+	ctx := context.TODO()
+	addr := "localhost:1025"
+	client, _ := generalsmtp.OpenMailer(ctx, addr, nil)
+	client.WithDefaultFrom(mail.Address{Address: "news@example.com"})
+	client.WithDefaultFrom(mail.Address{Address: "importants@example.com"})
+}
+
 func main() {
 	basic()
 	withTemplate()

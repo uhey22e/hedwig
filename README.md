@@ -58,6 +58,16 @@ tmpl.Execute(msg, "Bob")
 client.SendMail(context.TODO(), from, to, msg)
 ```
 
+You can duplicate the client to use multiple "from" addresses.
+
+```go
+ctx := context.TODO()
+addr := "smtp.example.com:25"
+client, _ := generalsmtp.OpenMailer(ctx, addr, nil)
+news := client.WithDefaultFrom(mail.Address{Address: "news@example.com"})
+importants := client.WithDefaultFrom(mail.Address{Address: "importants@example.com"})
+```
+
 ## Supported services
 
 ### Amazon SES
