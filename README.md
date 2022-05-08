@@ -34,7 +34,7 @@ import (
 
 from := mail.Address{Address: "from@example.com"}
 auth := smtp.PlainAuth("", from.Address, "yourpassword", "smtp.gmail.com")
-client, _ := generalsmtp.OpenMailer(context.TODO(), "smtp.gmail.com:587", auth)
+client, _ := generalsmtp.OpenMailer(context.TODO(), "smtp.gmail.com:587", auth, hedwig.DefaultFrom(from))
 to := []mail.Address{
 	{Address: "to@example.com"},
 }

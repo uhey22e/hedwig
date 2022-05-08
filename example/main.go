@@ -14,7 +14,7 @@ import (
 func basic() {
 	from := mail.Address{Address: "from@example.com"}
 	auth := smtp.PlainAuth("", from.Address, "yourpassword", "localhost")
-	client, _ := generalsmtp.OpenMailer(context.TODO(), "localhost:1025", auth)
+	client, _ := generalsmtp.OpenMailer(context.TODO(), "localhost:1025", auth, hedwig.DefaultFrom(from))
 	to := []mail.Address{
 		{Address: "to@example.com"},
 	}
@@ -23,12 +23,12 @@ func basic() {
 	}
 	// hedwig.EMail has io.Writer interface to write the message body.
 	io.WriteString(msg, "Hello world.")
-	client.SendMail(context.TODO(), from, to, msg)
+	client.SendMail(context.TODO(), to, msg)
 }
 
 func withTemplate() {
-	client, _ := generalsmtp.OpenMailer(context.TODO(), "localhost:1025", nil)
 	from := mail.Address{Address: "from@example.com"}
+	client, _ := generalsmtp.OpenMailer(context.TODO(), "localhost:1025", nil, hedwig.DefaultFrom(from))
 	to := []mail.Address{
 		{Address: "to@example.com"},
 	}
@@ -36,9 +36,9 @@ func withTemplate() {
 		Subject:     "日本語を含む件名",
 		ContentType: hedwig.ContentTypeHTML,
 	}
-	tmpl, _ := template.New("").Parse(`<p>Hello {{ . }}.</p><p>こんにちは、{{ . }}</p>`)
+	tmpl, _ := template.New("").Parse(`<p>Hello {{ . }}.</p><p>こんにちは、{{ . }}。</p>`)
 	tmpl.Execute(msg, "Bob")
-	client.SendMail(context.TODO(), from, to, msg)
+	client.SendMail(context.TODO(), to, msg)
 }
 
 func main() {

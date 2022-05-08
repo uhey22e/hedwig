@@ -4,40 +4,62 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"net/mail"
 )
 
 type Mailer struct {
-	d Driver
+	d    Driver
+	from mail.Address
 }
+
+type Config struct {
+	From mail.Address
+}
+
+type MailerOptionFn func(m *Mailer)
 
 type Driver interface {
 	SendMail(ctx context.Context, from mail.Address, to []mail.Address, mail *Mail) error
 }
 
 var (
-	drivers          map[string]Driver
 	ErrUnknownDriver = errors.New("unknown driver")
 )
 
 // NewMailer is intended for use by drivers only. Do not use in application code.
-func NewMailer(d Driver) *Mailer {
-	return &Mailer{d: d}
-}
-
-func OpenMailer(driverName string) (*Mailer, error) {
-	drv, ok := drivers[driverName]
-	if !ok {
-		return nil, fmt.Errorf("%w: %s", ErrUnknownDriver, driverName)
+func NewMailer(d Driver, opts ...MailerOptionFn) *Mailer {
+	m := &Mailer{d: d}
+	for i := range opts {
+		opts[i](m)
 	}
-	return &Mailer{
-		d: drv,
-	}, nil
+	return m
 }
 
-// SendMail sends an email.
-func (m *Mailer) SendMail(ctx context.Context, from mail.Address, to []mail.Address, mail *Mail) error {
+// DefaultFrom sets an default email address for From property.
+func DefaultFrom(from mail.Address) MailerOptionFn {
+	return func(m *Mailer) {
+		m.from = from
+	}
+}
+
+// WithDefaultFrom creates an client with the DefaultFrom option.
+func (m *Mailer) WithDefaultFrom(from mail.Address) *Mailer {
+	return &Mailer{
+		d:    m.d,
+		from: from,
+	}
+}
+
+// SendMail sends an email from the default from address.
+func (m *Mailer) SendMail(ctx context.Context, to []mail.Address, mail *Mail) error {
+	if m.from.Address == "" {
+		return errors.New("default from address is empty")
+	}
+	return m.d.SendMail(ctx, m.from, to, mail)
+}
+
+// SendMail sends an email from specific address.
+func (m *Mailer) SendMailFrom(ctx context.Context, from mail.Address, to []mail.Address, mail *Mail) error {
 	return m.d.SendMail(ctx, from, to, mail)
 }
 

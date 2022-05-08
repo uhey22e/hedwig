@@ -34,12 +34,12 @@ var (
 	maxBase64Len = base64.StdEncoding.DecodedLen(maxEncodedWordLen)
 )
 
-func OpenMailer(ctx context.Context, addr string, auth smtp.Auth) (*hedwig.Mailer, error) {
+func OpenMailer(ctx context.Context, addr string, auth smtp.Auth, opts ...hedwig.MailerOptionFn) (*hedwig.Mailer, error) {
 	d := &Mailer{
 		address: addr,
 		auth:    auth,
 	}
-	return hedwig.NewMailer(d), nil
+	return hedwig.NewMailer(d, opts...), nil
 }
 
 func (c *Mailer) SendMail(ctx context.Context, from mail.Address, to []mail.Address, m *hedwig.Mail) error {

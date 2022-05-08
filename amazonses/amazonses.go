@@ -17,11 +17,11 @@ type Mailer struct {
 	client *sesv2.Client
 }
 
-func OpenMailer(ctx context.Context, cfg aws.Config) *hedwig.Mailer {
+func OpenMailer(ctx context.Context, cfg aws.Config, opts ...hedwig.MailerOptionFn) *hedwig.Mailer {
 	d := &Mailer{
 		client: sesv2.NewFromConfig(cfg),
 	}
-	return hedwig.NewMailer(d)
+	return hedwig.NewMailer(d, opts...)
 }
 
 func (c *Mailer) SendMail(ctx context.Context, from mail.Address, to []mail.Address, m *hedwig.Mail) error {
