@@ -2,53 +2,19 @@ package hedwig
 
 import (
 	"context"
-	"net/mail"
-	"strings"
+
+	"github.com/uhey22e/hedwig/driver"
+	"github.com/uhey22e/hedwig/types"
 )
 
-var (
-	CharSet = "utf-8"
-)
-
-// Content-Type of the email body.
-type ContentType int
-
-const (
-	ContentTypePlainText ContentType = iota
-	ContentTypeHTML
-)
-
-// Get a value for Content-Type header.
-// e.g. text/plain; charset="utf-8"
-func (t ContentType) Value() string {
-	return map[ContentType]string{
-		ContentTypePlainText: `text/plain; charset="` + CharSet + `"`,
-		ContentTypeHTML:      `text/html; charset="` + CharSet + `"`,
-	}[t]
+type Mailer struct {
+	d driver.Mailer
 }
 
-type EMail struct {
-	From    mail.Address
-	To      []mail.Address
-	Subject string
-	Body    string
-
-	// Content type of body. Defaults to "text/plain".
-	ContentType ContentType
+func NewMailer(d driver.Mailer) *Mailer {
+	return &Mailer{d: d}
 }
 
-type Client interface {
-	// Send an email.
-	SendMail(context.Context, *EMail) error
-}
-
-func encodeAddresses(addrs []mail.Address) string {
-	s := &strings.Builder{}
-	for i, addr := range addrs {
-		if i != 0 {
-			s.WriteString(",")
-		}
-		s.WriteString(addr.String())
-	}
-	return s.String()
+func (m *Mailer) SendMail(ctx context.Context, mail *types.Mail) error {
+	return m.d.SendMail(ctx, mail)
 }

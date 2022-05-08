@@ -1,22 +1,29 @@
-package hedwig
+package generalsmtp
 
 import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"fmt"
 	"io"
 	"mime"
+	"net/mail"
 	"net/smtp"
+	"strings"
 	"unicode/utf8"
+
+	"github.com/uhey22e/hedwig"
+	"github.com/uhey22e/hedwig/types"
 )
 
-type SMTPClient struct {
-	Address string
-	Auth    smtp.Auth
+type Mailer struct {
+	address string
+	auth    smtp.Auth
 }
 
 const (
-	initialBufferSize = 1024
+	defaultCharSet = "utf-8"
+	initialBufLen  = 1024
 	// The maximum length of an encoded-word is 75 characters.
 	// See RFC 2047, section 2.
 	maxEncodedWordLen = 75
@@ -27,9 +34,17 @@ var (
 	maxBase64Len = base64.StdEncoding.DecodedLen(maxEncodedWordLen)
 )
 
-func (c *SMTPClient) SendMail(ctx context.Context, m *EMail) error {
+func NewMailer(ctx context.Context, addr string, auth smtp.Auth) (*hedwig.Mailer, error) {
+	d := &Mailer{
+		address: addr,
+		auth:    auth,
+	}
+	return hedwig.NewMailer(d), nil
+}
+
+func (c *Mailer) SendMail(ctx context.Context, m *types.Mail) error {
 	buf := &bytes.Buffer{}
-	buf.Grow(initialBufferSize + base64.StdEncoding.EncodedLen(len(m.Body)))
+	buf.Grow(initialBufLen)
 	err := writeSMTPHeaders(buf, m)
 	if err != nil {
 		return err
@@ -43,19 +58,18 @@ func (c *SMTPClient) SendMail(ctx context.Context, m *EMail) error {
 		return err
 	}
 	to := make([]string, len(m.To))
-	for i, s := range m.To {
-		to[i] = s.Address
+	for i, t := range m.To {
+		to[i] = t.Address
 	}
-	err = smtp.SendMail(c.Address, c.Auth, m.From.Address, to, buf.Bytes())
-	return err
+	return smtp.SendMail(c.address, c.auth, m.From.Address, to, buf.Bytes())
 }
 
-func writeSMTPHeaders(w io.Writer, m *EMail) (err error) {
+func writeSMTPHeaders(w io.Writer, m *types.Mail) (err error) {
 	lines := []string{
 		"From: " + m.From.String(),
 		"To: " + encodeAddresses(m.To),
-		"Subject: " + mime.BEncoding.Encode(CharSet, m.Subject),
-		"Content-Type: " + m.ContentType.Value(),
+		"Subject: " + mime.BEncoding.Encode(defaultCharSet, m.Subject),
+		"Content-Type: " + fmt.Sprintf("%s; charset=\"%s\"", m.ContentType, defaultCharSet),
 		"Content-Transfer-Encoding: base64",
 	}
 	for _, l := range lines {
@@ -100,4 +114,15 @@ func writeSMTPBody(w io.Writer, body string) error {
 	}
 	_, err = io.WriteString(enc, body[last:])
 	return err
+}
+
+func encodeAddresses(addrs []mail.Address) string {
+	s := &strings.Builder{}
+	for i, addr := range addrs {
+		if i != 0 {
+			s.WriteString(",")
+		}
+		s.WriteString(addr.String())
+	}
+	return s.String()
 }
