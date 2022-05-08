@@ -2,28 +2,46 @@ package main
 
 import (
 	"context"
-	"log"
+	"html/template"
+	"io"
 	"net/mail"
+	"net/smtp"
 
+	"github.com/uhey22e/hedwig"
 	"github.com/uhey22e/hedwig/generalsmtp"
-	"github.com/uhey22e/hedwig/types"
 )
 
-func main() {
-	client, err := generalsmtp.NewMailer(context.TODO(), "localhost:1025", nil)
-	if err != nil {
-		log.Fatal(err)
+func basic() {
+	from := mail.Address{Address: "from@example.com"}
+	auth := smtp.PlainAuth("", from.Address, "yourpassword", "localhost")
+	client, _ := generalsmtp.OpenMailer(context.TODO(), "localhost:1025", auth)
+	to := []mail.Address{
+		{Address: "to@example.com"},
 	}
-	email := &types.Mail{
-		From: mail.Address{Address: "yourname@gmail.com"},
-		To: []mail.Address{
-			{Address: "to@gmail.com"},
-		},
+	msg := &hedwig.Mail{
 		Subject: "Subject",
-		Body:    "Hello world.",
 	}
-	err = client.SendMail(context.TODO(), email)
-	if err != nil {
-		log.Fatal(err)
+	// hedwig.EMail has io.Writer interface to write the message body.
+	io.WriteString(msg, "Hello world.")
+	client.SendMail(context.TODO(), from, to, msg)
+}
+
+func withTemplate() {
+	client, _ := generalsmtp.OpenMailer(context.TODO(), "localhost:1025", nil)
+	from := mail.Address{Address: "from@example.com"}
+	to := []mail.Address{
+		{Address: "to@example.com"},
 	}
+	msg := &hedwig.Mail{
+		Subject:     "日本語を含む件名",
+		ContentType: hedwig.ContentTypeHTML,
+	}
+	tmpl, _ := template.New("").Parse(`<p>Hello {{ . }}.</p><p>こんにちは、{{ . }}</p>`)
+	tmpl.Execute(msg, "Bob")
+	client.SendMail(context.TODO(), from, to, msg)
+}
+
+func main() {
+	basic()
+	withTemplate()
 }

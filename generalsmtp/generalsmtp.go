@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"mime"
@@ -13,7 +14,6 @@ import (
 	"unicode/utf8"
 
 	"github.com/uhey22e/hedwig"
-	"github.com/uhey22e/hedwig/types"
 )
 
 type Mailer struct {
@@ -34,7 +34,7 @@ var (
 	maxBase64Len = base64.StdEncoding.DecodedLen(maxEncodedWordLen)
 )
 
-func NewMailer(ctx context.Context, addr string, auth smtp.Auth) (*hedwig.Mailer, error) {
+func OpenMailer(ctx context.Context, addr string, auth smtp.Auth) (*hedwig.Mailer, error) {
 	d := &Mailer{
 		address: addr,
 		auth:    auth,
@@ -42,32 +42,28 @@ func NewMailer(ctx context.Context, addr string, auth smtp.Auth) (*hedwig.Mailer
 	return hedwig.NewMailer(d), nil
 }
 
-func (c *Mailer) SendMail(ctx context.Context, m *types.Mail) error {
-	buf := &bytes.Buffer{}
-	buf.Grow(initialBufLen)
-	err := writeSMTPHeaders(buf, m)
+func (c *Mailer) SendMail(ctx context.Context, from mail.Address, to []mail.Address, m *hedwig.Mail) error {
+	msg := &bytes.Buffer{}
+	msg.Grow(initialBufLen + base64.StdEncoding.EncodedLen(m.Len()))
+	err := writeSMTPHeaders(msg, from, to, m)
 	if err != nil {
 		return err
 	}
-	_, err = buf.Write(crlf)
+	err = writeSMTPBody(msg, m.Bytes())
 	if err != nil {
 		return err
 	}
-	err = writeSMTPBody(buf, m.Body)
-	if err != nil {
-		return err
+	tos := make([]string, len(to))
+	for i, t := range to {
+		tos[i] = t.Address
 	}
-	to := make([]string, len(m.To))
-	for i, t := range m.To {
-		to[i] = t.Address
-	}
-	return smtp.SendMail(c.address, c.auth, m.From.Address, to, buf.Bytes())
+	return smtp.SendMail(c.address, c.auth, from.Address, tos, msg.Bytes())
 }
 
-func writeSMTPHeaders(w io.Writer, m *types.Mail) (err error) {
+func writeSMTPHeaders(w io.Writer, from mail.Address, to []mail.Address, m *hedwig.Mail) (err error) {
 	lines := []string{
-		"From: " + m.From.String(),
-		"To: " + encodeAddresses(m.To),
+		"From: " + from.String(),
+		"To: " + encodeAddresses(to),
 		"Subject: " + mime.BEncoding.Encode(defaultCharSet, m.Subject),
 		"Content-Type: " + fmt.Sprintf("%s; charset=\"%s\"", m.ContentType, defaultCharSet),
 		"Content-Transfer-Encoding: base64",
@@ -78,16 +74,23 @@ func writeSMTPHeaders(w io.Writer, m *types.Mail) (err error) {
 			return
 		}
 	}
+	_, err = w.Write(crlf)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
-func writeSMTPBody(w io.Writer, body string) error {
+func writeSMTPBody(w io.Writer, body []byte) error {
+	if !utf8.Valid(body) {
+		return errors.New("body must be valid utf-8 string")
+	}
 	enc := base64.NewEncoder(base64.StdEncoding, w)
 	defer enc.Close()
 
 	// If the content is short, do not bother splitting the encoded-word.
 	if base64.StdEncoding.EncodedLen(len(body)) <= maxEncodedWordLen {
-		_, err := io.WriteString(enc, body)
+		_, err := enc.Write(body)
 		return err
 	}
 
@@ -96,15 +99,15 @@ func writeSMTPBody(w io.Writer, body string) error {
 	for i := 0; i < len(body); i += runeLen {
 		// Multi-byte characters must not be split across encoded-words.
 		// See RFC 2047, section 5.3.
-		_, runeLen = utf8.DecodeRuneInString(body[i:])
+		_, runeLen = utf8.DecodeRune(body[i:])
 		if currentLen+runeLen <= maxBase64Len {
 			currentLen += runeLen
 		} else {
-			_, err = io.WriteString(enc, body[last:i])
+			_, err = enc.Write(body[last:i])
 			if err != nil {
 				return err
 			}
-			_, err = io.WriteString(w, "\r\n")
+			_, err = w.Write(crlf)
 			if err != nil {
 				return err
 			}
@@ -112,7 +115,7 @@ func writeSMTPBody(w io.Writer, body string) error {
 			currentLen = runeLen
 		}
 	}
-	_, err = io.WriteString(enc, body[last:])
+	_, err = enc.Write(body[last:])
 	return err
 }
 

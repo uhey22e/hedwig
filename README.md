@@ -20,7 +20,7 @@ go get github.com/uhey22e/hedwig
 You can send an email via the `hedwig.Client` interface.
 SMTP, Amazon SES and other clients implements this interface.
 
-For example - send an email via the Gmail SMTP server.
+Basic usage - send an email with Gmail.
 
 ```go
 import (
@@ -29,40 +29,52 @@ import (
 	"net/smtp"
 
 	"github.com/uhey22e/hedwig"
+	"github.com/uhey22e/hedwig/generalsmtp"
 )
 
-var client hedwig.Client = &hedwig.SMTPClient{
-	Address: "smtp.gmail.com:587",
-	Auth:    smtp.PlainAuth("", "yourname@gmail.com", "password", "smtp.gmail.com"),
+from := mail.Address{Address: "from@example.com"}
+auth := smtp.PlainAuth("", from.Address, "yourpassword", "smtp.gmail.com")
+client, _ := generalsmtp.OpenMailer(context.TODO(), "smtp.gmail.com:587", auth)
+to := []mail.Address{
+	{Address: "to@example.com"},
 }
-
-email := &hedwig.EMail{
-	From: mail.Address{Address: "yourname@gmail.com"},
-	To: []mail.Address{
-		{Address: "to@gmail.com"},
-	},
+msg := &hedwig.Mail{
 	Subject: "Subject",
-	Body:    "Hello world.",
 }
-client.SendMail(context.TODO(), email)
+// hedwig.EMail has io.Writer interface to write the message body.
+io.WriteString(msg, "Hello world.")
+client.SendMail(context.TODO(), from, to, msg)
 ```
+
+Or you can use [html/template](https://pkg.go.dev/html/template) to render the message body.
+
+```go
+msg := &hedwig.Mail{
+	Subject:     "Subject",
+	ContentType: hedwig.ContentTypeHTML,
+}
+tmpl, _ := template.New("").Parse(`<p>Hello {{ . }}.</p>`)
+tmpl.Execute(msg, "Bob")
+client.SendMail(context.TODO(), from, to, msg)
+```
+
+## Supported services
 
 ### Amazon SES
 
-You can use `AmazonSESClient`.
+You can use `github.com/uhey22e/hedwig/amazonses` driver.
+This driver uses [aws-sdk-go-v2](github.com/aws/aws-sdk-go-v2) package.
 
 ```go
 import (
 	"context"
-	"net/mail"
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/uhey22e/hedwig"
+	"github.com/uhey22e/hedwig/amazonses"
 )
-
-var client hedwig.Client
 
 ctx := context.TODO()
 cfg, _ := config.LoadDefaultConfig(ctx)
-client = hedwig.NewAmazonSESClient(cfg)
+client := amazonses.OpenMailer(ctx, cfg)
 ```

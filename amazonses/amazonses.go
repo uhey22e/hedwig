@@ -2,9 +2,9 @@ package amazonses
 
 import (
 	"context"
+	"net/mail"
 
 	"github.com/uhey22e/hedwig"
-	"github.com/uhey22e/hedwig/types"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sesv2"
@@ -17,18 +17,18 @@ type Mailer struct {
 	client *sesv2.Client
 }
 
-func NewAmazonSESClient(cfg aws.Config) *hedwig.Mailer {
+func OpenMailer(ctx context.Context, cfg aws.Config) *hedwig.Mailer {
 	d := &Mailer{
 		client: sesv2.NewFromConfig(cfg),
 	}
 	return hedwig.NewMailer(d)
 }
 
-func (c *Mailer) SendMail(ctx context.Context, m *types.Mail) error {
+func (c *Mailer) SendMail(ctx context.Context, from mail.Address, to []mail.Address, m *hedwig.Mail) error {
 	params := &sesv2.SendEmailInput{
-		FromEmailAddress: aws.String(m.From.String()),
+		FromEmailAddress: aws.String(from.String()),
 		Destination: &sesTypes.Destination{
-			ToAddresses: make([]string, len(m.To)),
+			ToAddresses: make([]string, len(to)),
 		},
 		Content: &sesTypes.EmailContent{
 			Simple: &sesTypes.Message{
@@ -38,20 +38,20 @@ func (c *Mailer) SendMail(ctx context.Context, m *types.Mail) error {
 			},
 		},
 	}
-	for i, t := range m.To {
+	for i, t := range to {
 		params.Destination.ToAddresses[i] = t.String()
 	}
 	switch m.ContentType {
-	case types.ContentTypePlainText:
+	case hedwig.ContentTypePlainText:
 		params.Content.Simple.Body = &sesTypes.Body{
 			Text: &sesTypes.Content{
-				Data: &m.Body,
+				Data: aws.String(m.String()),
 			},
 		}
-	case types.ContentTypeHTML:
+	case hedwig.ContentTypeHTML:
 		params.Content.Simple.Body = &sesTypes.Body{
 			Html: &sesTypes.Content{
-				Data: &m.Body,
+				Data: aws.String(m.String()),
 			},
 		}
 	}
